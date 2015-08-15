@@ -61,25 +61,43 @@ namespace LauncherWV
 
         static void Main(string[] args)
         {
-            Console.WriteLine("Warranty Voiders ME3 Launcher");
+            Console.WriteLine("Warranty Voider's ME3 Launcher [DLC Patch + Console Patch]");
+            Console.WriteLine("Modified by FemShep");
             if (!LaunchME3())
             {
-                Console.WriteLine("Can't find MassEffect3.exe");
+                Console.WriteLine("Can't find MassEffect3.exe in same directory as this .exe.");
+                System.Threading.Thread.Sleep(3000);
                 return;
+            } else
+            {
+                Console.WriteLine("Executed MassEffect3.exe. Waiting for Origin/MassEffect3 to sync.");
             }
             System.Threading.Thread.Sleep(5000);
-            if (!FindProcess())
+            int attempts = 0;
+            int maxattempts = 5;
+            while (!FindProcess())
             {
-                Console.WriteLine("Can't find me3 process");
-                return;
+                if (attempts > maxattempts)
+                {
+                    //give up
+                    Console.WriteLine("MassEffect3.exe did not restart. Giving up on patching process.");
+                    System.Threading.Thread.Sleep(3000);
+                    return;
+                }
+
+                //try again
+                attempts++;
+                Console.WriteLine("MassEffect3.exe has not yet restarted. Checking again in 5 seconds (attempt "+attempts+" of "+maxattempts+").");
+                System.Threading.Thread.Sleep(5000);
             }
+            Console.WriteLine("MassEffect3.exe has restarted.");
             int tries = 0;
             while (true)
             {
-                Console.WriteLine("Try #" + tries + " :");
+                Console.WriteLine("Scanning for Modified DLC Offset/Console Patch Offset (attempt " + tries + ") :");
                 if (DumpAndSeek() && DumpAndSeek2())
                 {
-                    Console.WriteLine("found!");
+                    Console.WriteLine("::::Found Offsets::::");
                     break;
                 }
                 else
@@ -89,7 +107,8 @@ namespace LauncherWV
                 }
                 if (tries == 10)
                 {
-                    Console.WriteLine("Cant find match!");
+                    Console.WriteLine("Unable to find offsets, giving up. If this .exe is cracked LauncherWV may not work on it.");
+                    System.Threading.Thread.Sleep(3000);
                     return;
                 }
             }
@@ -97,22 +116,20 @@ namespace LauncherWV
                 Patch();
             if (Check2())
                 Patch2();
-            for (int i = 5; i >= 0; i--)
-            {
-                Console.WriteLine("Exit in " + i + "...");
-                System.Threading.Thread.Sleep(1000);
-            }
+            Console.WriteLine("--------------------------------");
+            Console.WriteLine("Modified DLC should now verify. Console can be opened with tab or tilde or whatever your keybinds specify.");
+            Console.WriteLine("LauncherWV is closing (10 seconds).");
+            System.Threading.Thread.Sleep(10000);
             Environment.Exit(0);
         }
 
         public static bool LaunchME3()
         {
             string path = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) + "\\";
-            Console.WriteLine(path + "masseffect3.exe");
+            Console.WriteLine("Launching Mass Effect 3 from: "+ path + "masseffect3.exe");
             if (!File.Exists(path + "masseffect3.exe"))
                 return false;
             RunShell(path + "masseffect3.exe","");
-            Console.WriteLine("started me3...");
             return true;
         }
 
@@ -123,7 +140,6 @@ namespace LauncherWV
                 return false;
             proc = OpenProcess(0x8 | 0x10 | 0x20, true, procs[0].Id); 
             procID = procs[0].Id;
-            Console.WriteLine("found process...");
             return true;
         }
 
@@ -133,7 +149,7 @@ namespace LauncherWV
             int bytesReadTotal = 0;
             Process p = Process.GetProcessById(procID);
             ProcessModule pm = p.MainModule;
-            Console.WriteLine("Base Adress : 0x" + pm.BaseAddress.ToInt32().ToString("X8") + " Name: " + pm.ModuleName + " Size: 0x" + pm.ModuleMemorySize.ToString("X8"));
+            //Console.WriteLine("Base Adress : 0x" + pm.BaseAddress.ToInt32().ToString("X8") + " Name: " + pm.ModuleName + " Size: 0x" + pm.ModuleMemorySize.ToString("X8"));
             CodeSegment = new byte[pm.ModuleMemorySize];
             uint PTR = (uint)pm.BaseAddress;
             int len;
@@ -144,7 +160,7 @@ namespace LauncherWV
                 ReadProcessMemory(proc, (IntPtr)PTR, buff, len, out bytesRead);
                 if (bytesRead == 0)
                 {
-                    Console.WriteLine("Error while reading Memory");
+                    Console.WriteLine("Error while reading memory");
                     return false;
                 }
                 for (int i = 0; i < len; i++)
@@ -152,8 +168,8 @@ namespace LauncherWV
                 bytesReadTotal += bytesRead;
                 PTR += (uint)bytesRead;
             }
-            Console.WriteLine("Read bytes total : 0x" + bytesReadTotal.ToString("X8"));            
-            Console.WriteLine("Searching DLC Check...");
+            //Console.WriteLine("Read bytes total : 0x" + bytesReadTotal.ToString("X8"));            
+            //Console.WriteLine(" DLC Check...");
             for (int i = 0; i < bytesReadTotal - pattern.Length; i++)
             {
                 if (CodeSegment[i] == pattern[0] &&
@@ -170,19 +186,19 @@ namespace LauncherWV
                             };
                         if (match)
                         {
-                            Console.WriteLine("Found match @ 0x" + (i + (uint)pm.BaseAddress + 0x9).ToString("X8"));
+                            //Console.WriteLine("Found match @ 0x" + (i + (uint)pm.BaseAddress + 0x9).ToString("X8"));
                             PatchOffset1 = (uint)i + (uint)pm.BaseAddress + 0x9;
                             return true;
                         }
                     }
             }
-            Console.WriteLine("No match found!");
+            Console.WriteLine("Modified DLC offset not found. EXE may not be fully loaded yet.");
             return false;
         }
 
         public static bool DumpAndSeek2()
         {
-            Console.WriteLine("Searching Console Patch...");
+            //Console.WriteLine("Searching Console Patch...");
             for (int i = 0; i < CodeSegment.Length - pattern2.Length; i++)
             {
                 if (CodeSegment[i] == pattern2[0] &&
@@ -201,13 +217,13 @@ namespace LauncherWV
                     {
                         Process p = Process.GetProcessById(procID);
                         ProcessModule pm = p.MainModule;
-                        Console.WriteLine("Found match @ 0x" + (i + (uint)pm.BaseAddress + 0x5).ToString("X8"));
+                        //Console.WriteLine("Found match @ 0x" + (i + (uint)pm.BaseAddress + 0x5).ToString("X8"));
                         PatchOffset2 = (uint)i + (uint)pm.BaseAddress + 0x5;
                         return true;
                     }
                 }
             }
-            Console.WriteLine("No match found!");
+            Console.WriteLine("Console offset not found. EXE may not be fully loaded yet.");
             return false;
         }
 
@@ -223,7 +239,7 @@ namespace LauncherWV
                 return false;
             }
             UInt16 val = BitConverter.ToUInt16(buff, 0);
-            Console.WriteLine("Value is: 0x" + val.ToString("X2") + " expected : 0xC38B");
+            //Console.WriteLine("Value is: 0x" + val.ToString("X2") + " expected : 0xC38B");
             if (!(val == 0xC38B))
             {
                 Console.WriteLine("Value is not 0xC38B (mov eax,ebx)");
@@ -234,7 +250,7 @@ namespace LauncherWV
 
         public static bool Check2()
         {
-            Console.WriteLine("Offset: 0x" + PatchOffset2.ToString("X8"));
+            //Console.WriteLine("Offset: 0x" + PatchOffset2.ToString("X8"));
             uint PTR = PatchOffset2;
             byte[] buff = new byte[4];
             int bytesRead;
@@ -245,7 +261,7 @@ namespace LauncherWV
                 return false;
             }
             UInt32 val = BitConverter.ToUInt32(buff, 0);
-            Console.WriteLine("Value is: 0x" + val.ToString("X2") + " expected : 0x01");
+            //Console.WriteLine("Value is: 0x" + val.ToString("X2") + " expected : 0x01");
             if (!(val == 0x01))
             {
                 Console.WriteLine("Value is not 0x01");
@@ -273,11 +289,11 @@ namespace LauncherWV
                 return;
             }
             UInt16 val = BitConverter.ToUInt16(buff, 0);
-            Console.WriteLine("Value is: 0x" + val.ToString("X2"));
+            //Console.WriteLine("Value is: 0x" + val.ToString("X2"));
             if (!(val == newval))
                 Console.WriteLine("Value is not 0x01B0 (mov al, 1)");
             else
-                Console.WriteLine("SUCCESS!!");
+                Console.WriteLine("Enabled modified DLC.");
             return;
         }
 
@@ -300,11 +316,11 @@ namespace LauncherWV
                 return;
             }
             UInt32 val = BitConverter.ToUInt32(buff, 0);
-            Console.WriteLine("Value is: 0x" + val.ToString("X2"));
+            //Console.WriteLine("Value is: 0x" + val.ToString("X2"));
             if (!(val == newval))
                 Console.WriteLine("Value is not 0x00");
             else
-                Console.WriteLine("SUCCESS!!");
+                Console.WriteLine("Found console offset.");
             buff = BitConverter.GetBytes(newval);
             PTR += 0xD;
             WriteProcessMemory(proc, (IntPtr)PTR, buff, 4, out bytesRead);
@@ -322,9 +338,9 @@ namespace LauncherWV
             val = BitConverter.ToUInt32(buff, 0);
             Console.WriteLine("Value is: 0x" + val.ToString("X2"));
             if (!(val == newval))
-                Console.WriteLine("Value is not 0x00");
+                Console.WriteLine("Value is not 0x00. Console not enabled.");
             else
-                Console.WriteLine("SUCCESS!!");
+                Console.WriteLine("::::Enabled the full console.::::");
             return;
         }
 
